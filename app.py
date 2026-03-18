@@ -98,6 +98,7 @@ with st.sidebar:
             ("Anthropic", "ANTHROPIC_API_KEY"),
             ("Google",    "GOOGLE_API_KEY"),
             ("DeepSeek",  "DEEPSEEK_API_KEY"),
+            ("MiniMax",   "MINIMAX_API_KEY"),
         ]:
             saved = db.get_config_value(key) or ""
             val = st.text_input(

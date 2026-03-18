@@ -9,7 +9,8 @@ AVAILABLE_MODELS = [
     # OpenAI
     "gpt-4o",
     "gpt-4o-mini",
-    # Anthropic
+    # Anthropic / MiniMax
+    "MiniMax-M2.7",           # 支持 thinking
     "claude-opus-4-6",        # 最强推理 / 长文本
     "claude-sonnet-4-6",
     # Google Gemini

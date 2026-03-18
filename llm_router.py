@@ -52,6 +52,12 @@ _GEMINI_MODELS = {
     "gemini-1.5-flash",
 }
 
+_MINIMAX_MODELS = {
+    "MiniMax-M2.7",
+}
+
+_MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic"
+
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 
@@ -132,7 +138,13 @@ def get_llm_response(
     """
     messages = build_messages(session_id, current_model, user_message)
 
-    if current_model in _ANTHROPIC_MODELS:
+    if current_model in _MINIMAX_MODELS:
+        reply = _call_anthropic(
+            current_model, messages,
+            api_key=_get_api_key("MINIMAX_API_KEY"),
+            base_url=_MINIMAX_BASE_URL,
+        )
+    elif current_model in _ANTHROPIC_MODELS:
         reply = _call_anthropic(current_model, messages)
     elif current_model in _GEMINI_MODELS:
         reply = _call_gemini(current_model, messages)
@@ -174,7 +186,13 @@ def get_llm_response_stream(
     messages = build_messages(session_id, current_model, user_message)
     db.add_message(session_id, "user", user_message, model_used=current_model)
 
-    if current_model in _ANTHROPIC_MODELS:
+    if current_model in _MINIMAX_MODELS:
+        raw_gen = _stream_anthropic(
+            current_model, messages,
+            api_key=_get_api_key("MINIMAX_API_KEY"),
+            base_url=_MINIMAX_BASE_URL,
+        )
+    elif current_model in _ANTHROPIC_MODELS:
         raw_gen = _stream_anthropic(current_model, messages)
     elif current_model in _GEMINI_MODELS:
         raw_gen = _stream_gemini(current_model, messages)
@@ -248,15 +266,21 @@ def _call_openai_compatible(
 # Anthropic 调用
 # ---------------------------------------------------------------------------
 
-def _call_anthropic(model: str, messages: list[dict]) -> str:
+def _call_anthropic(
+    model: str,
+    messages: list[dict],
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> str:
     try:
         import anthropic
     except ImportError:
         raise RuntimeError("anthropic 包未安装，请运行: pip install anthropic")
 
-    api_key = _get_api_key("ANTHROPIC_API_KEY")
+    if api_key is None:
+        api_key = _get_api_key("ANTHROPIC_API_KEY")
     if not api_key:
-        raise ValueError("请在侧边栏 🔑 API Keys 中填写 ANTHROPIC_API_KEY")
+        raise ValueError("请在侧边栏 🔑 API Keys 中填写 ANTHROPIC_API_KEY / MINIMAX_API_KEY")
 
     # Anthropic API 的 system prompt 需要单独传，不能放在 messages 里
     system_prompt = ""
@@ -267,7 +291,10 @@ def _call_anthropic(model: str, messages: list[dict]) -> str:
         else:
             chat_messages.append({"role": msg["role"], "content": msg["content"]})
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client_kwargs = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = anthropic.Anthropic(**client_kwargs)
     kwargs = dict(
         model=model,
         max_tokens=4096,
@@ -405,15 +432,21 @@ def _stream_gemini(model: str, messages: list[dict]) -> Iterator[str]:
             yield chunk.text
 
 
-def _stream_anthropic(model: str, messages: list[dict]) -> Iterator[str]:
+def _stream_anthropic(
+    model: str,
+    messages: list[dict],
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> Iterator[str]:
     try:
         import anthropic
     except ImportError:
         raise RuntimeError("anthropic 包未安装，请运行: pip install anthropic")
 
-    api_key = _get_api_key("ANTHROPIC_API_KEY")
+    if api_key is None:
+        api_key = _get_api_key("ANTHROPIC_API_KEY")
     if not api_key:
-        raise ValueError("请在侧边栏 🔑 API Keys 中填写 ANTHROPIC_API_KEY")
+        raise ValueError("请在侧边栏 🔑 API Keys 中填写 ANTHROPIC_API_KEY / MINIMAX_API_KEY")
 
     system_prompt = ""
     chat_messages = []
@@ -423,7 +456,10 @@ def _stream_anthropic(model: str, messages: list[dict]) -> Iterator[str]:
         else:
             chat_messages.append({"role": msg["role"], "content": msg["content"]})
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client_kwargs = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    client = anthropic.Anthropic(**client_kwargs)
     kwargs = dict(model=model, max_tokens=4096, messages=chat_messages)
     if system_prompt:
         kwargs["system"] = system_prompt
